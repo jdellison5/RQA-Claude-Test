@@ -1,8 +1,12 @@
 """
-RSI Mean Reversion strategy.
+RSI Mean Reversion strategy with optional trend filter.
 
 Buys when RSI falls below the oversold threshold (default 25),
 sells when RSI rises above the overbought threshold (default 75).
+
+Trend filter (default: 200-day SMA): long positions are only allowed when
+price is above the SMA. When price is below the SMA, any open position is
+closed and new entries are blocked.
 
 Defaults to RSI(2) — a short-period mean-reversion approach.
 
@@ -27,35 +31,41 @@ class RSIMeanReversion(BaseStrategy):
         period: int = 2,
         oversold: int = 25,
         overbought: int = 75,
+        trend_sma: int = 200,
     ) -> None:
-        super().__init__(name=f"RSI_MeanReversion({period},{oversold},{overbought})")
+        super().__init__(name=f"RSI_MeanReversion({period},{oversold},{overbought},SMA{trend_sma})")
         self.period = period
         self.oversold = oversold
         self.overbought = overbought
+        self.trend_sma = trend_sma
 
     def generate_signals(self, data: pd.DataFrame) -> pd.DataFrame:
         """
-        Add RSI column and a look-ahead-bias-free signal column.
+        Add RSI, SMA, and a look-ahead-bias-free signal column.
 
         Columns added:
-            rsi    : RSI oscillator (0-100)
-            signal : 1 = long, 0 = flat (shifted by 1 bar)
+            rsi      : RSI oscillator (0-100)
+            sma_trend: trend filter SMA
+            signal   : 1 = long, 0 = flat (shifted by 1 bar)
 
         Signal logic:
-            - Enter long when RSI drops below oversold level
-            - Exit long when RSI rises above overbought level
+            - Enter long when RSI drops below oversold level AND price > SMA
+            - Exit long when RSI rises above overbought level OR price < SMA
             - Otherwise maintain current position (forward-filled)
         """
         df = data.copy()
 
         rsi_indicator = RSIIndicator(close=df["close"], window=self.period)
         df["rsi"] = rsi_indicator.rsi()
+        df["sma_trend"] = df["close"].rolling(window=self.trend_sma).mean()
+
+        above_trend = df["close"] > df["sma_trend"]
 
         # Level-based entries and exits
-        buy_signal = df["rsi"] < self.oversold
-        sell_signal = df["rsi"] > self.overbought
+        buy_signal = (df["rsi"] < self.oversold) & above_trend
+        sell_signal = (df["rsi"] > self.overbought) | ~above_trend
 
-        # Build signal using forward-fill: enter on oversold, exit on overbought
+        # Build signal using forward-fill: enter on oversold, exit on overbought or below SMA
         raw_signal = pd.Series(np.nan, index=df.index)
         raw_signal[buy_signal] = 1
         raw_signal[sell_signal] = 0
@@ -69,5 +79,6 @@ class RSIMeanReversion(BaseStrategy):
     def __repr__(self) -> str:
         return (
             f"RSIMeanReversion(period={self.period}, "
-            f"oversold={self.oversold}, overbought={self.overbought})"
+            f"oversold={self.oversold}, overbought={self.overbought}, "
+            f"trend_sma={self.trend_sma})"
         )

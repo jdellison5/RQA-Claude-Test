@@ -67,6 +67,7 @@ def test_rsi_generates_signal_and_rsi_columns(spy_data):
     strategy = RSIMeanReversion(period=2, oversold=25, overbought=75)
     result = strategy.generate_signals(spy_data)
     assert "rsi" in result.columns
+    assert "sma_trend" in result.columns
     assert "signal" in result.columns
 
 
@@ -89,18 +90,20 @@ def test_rsi_no_lookahead_bias(spy_data):
     """
     Verify look-ahead bias prevention: signal must not use today's close.
 
-    We check the FIRST bar where RSI2 drops below the oversold level.
+    We check the FIRST bar where RSI2 drops below oversold AND price > SMA trend filter.
     At that bar, signal must be 0. The 1 only appears at bar t+1.
     """
     strategy = RSIMeanReversion(period=2, oversold=25, overbought=75)
     result = strategy.generate_signals(spy_data)
 
     rsi = result["rsi"]
+    above_trend = result["close"] > result["sma_trend"]
 
-    all_buy_bars = result.index[rsi < 25]
+    # Find bars where both conditions for a buy are met
+    all_buy_bars = result.index[(rsi < 25) & above_trend]
 
     if len(all_buy_bars) == 0:
-        pytest.skip("No RSI2 oversold bars in SPY data for this period — adjust parameters")
+        pytest.skip("No RSI2 oversold bars above trend SMA in SPY data — adjust parameters")
 
     first_buy = all_buy_bars[0]
     first_buy_loc = result.index.get_loc(first_buy)
@@ -126,8 +129,23 @@ def test_strategy_repr_includes_parameters():
 
 
 def test_rsi_strategy_repr_includes_parameters():
-    strategy = RSIMeanReversion(period=7, oversold=25, overbought=75)
+    strategy = RSIMeanReversion(period=7, oversold=25, overbought=75, trend_sma=200)
     r = repr(strategy)
     assert "7" in r
     assert "25" in r
     assert "75" in r
+    assert "200" in r
+
+
+def test_rsi_trend_filter_blocks_longs_below_sma(spy_data):
+    """Signal must be 0 on any bar where close < sma_trend (after the shift)."""
+    strategy = RSIMeanReversion(period=2, oversold=25, overbought=75, trend_sma=200)
+    result = strategy.generate_signals(spy_data).dropna(subset=["sma_trend"])
+
+    below_trend = result["close"] < result["sma_trend"]
+    # signal at bar t reflects conditions at bar t-1, so compare to previous bar's trend state
+    prev_below_trend = below_trend.shift(1).fillna(False)
+    signals_when_prev_below = result.loc[prev_below_trend, "signal"]
+    assert (signals_when_prev_below == 0).all(), (
+        "Trend filter violated: signal=1 found on a bar where previous close was below SMA"
+    )
