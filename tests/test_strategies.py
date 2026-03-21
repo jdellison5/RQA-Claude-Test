@@ -1,4 +1,4 @@
-"""Tests for strategy signal generation."""
+"""Tests for strategy signal generation using real SPY data."""
 
 from __future__ import annotations
 
@@ -9,27 +9,27 @@ from strategies.ma_crossover import MovingAverageCrossover
 from strategies.rsi_mean_reversion import RSIMeanReversion
 
 
-def test_ma_crossover_generates_signal_column(synthetic_trending_data):
+def test_ma_crossover_generates_signal_column(spy_data):
     strategy = MovingAverageCrossover(fast_window=10, slow_window=20)
-    result = strategy.generate_signals(synthetic_trending_data)
+    result = strategy.generate_signals(spy_data)
     assert "signal" in result.columns
 
 
-def test_ma_crossover_adds_sma_columns(synthetic_trending_data):
+def test_ma_crossover_adds_sma_columns(spy_data):
     strategy = MovingAverageCrossover(fast_window=10, slow_window=20)
-    result = strategy.generate_signals(synthetic_trending_data)
+    result = strategy.generate_signals(spy_data)
     assert "sma_fast" in result.columns
     assert "sma_slow" in result.columns
 
 
-def test_ma_crossover_signal_values_are_valid(synthetic_trending_data):
+def test_ma_crossover_signal_values_are_valid(spy_data):
     strategy = MovingAverageCrossover(fast_window=10, slow_window=20)
-    result = strategy.generate_signals(synthetic_trending_data)
+    result = strategy.generate_signals(spy_data)
     unique_signals = set(result["signal"].unique())
     assert unique_signals.issubset({0, 1}), f"Unexpected signal values: {unique_signals}"
 
 
-def test_ma_crossover_no_lookahead_bias(synthetic_trending_data):
+def test_ma_crossover_no_lookahead_bias(spy_data):
     """
     Verify look-ahead bias prevention: the signal at bar t must not depend
     on the closing price at bar t.
@@ -38,9 +38,8 @@ def test_ma_crossover_no_lookahead_bias(synthetic_trending_data):
     at bar t, the signal at bar t is still 0 (the signal takes effect at bar t+1).
     """
     strategy = MovingAverageCrossover(fast_window=10, slow_window=20)
-    result = strategy.generate_signals(synthetic_trending_data)
+    result = strategy.generate_signals(spy_data)
 
-    # Find first golden cross: first bar where fast > slow AND previous bar had fast <= slow
     fast = result["sma_fast"]
     slow = result["sma_slow"]
     golden_cross_bars = result.index[
@@ -50,7 +49,6 @@ def test_ma_crossover_no_lookahead_bias(synthetic_trending_data):
     if len(golden_cross_bars) > 0:
         first_cross = golden_cross_bars[0]
         cross_loc = result.index.get_loc(first_cross)
-        # Signal at the cross bar must be 0 (the signal is for the NEXT bar)
         signal_at_cross = result.iloc[cross_loc]["signal"]
         assert signal_at_cross == 0, (
             f"Look-ahead bias detected: signal={signal_at_cross} at cross bar {first_cross}. "
@@ -58,68 +56,62 @@ def test_ma_crossover_no_lookahead_bias(synthetic_trending_data):
         )
 
 
-def test_ma_crossover_does_not_modify_original(synthetic_trending_data):
+def test_ma_crossover_does_not_modify_original(spy_data):
     strategy = MovingAverageCrossover(fast_window=10, slow_window=20)
-    original_cols = list(synthetic_trending_data.columns)
-    strategy.generate_signals(synthetic_trending_data)
-    assert list(synthetic_trending_data.columns) == original_cols
+    original_cols = list(spy_data.columns)
+    strategy.generate_signals(spy_data)
+    assert list(spy_data.columns) == original_cols
 
 
-def test_rsi_generates_signal_and_rsi_columns(synthetic_oscillating_data):
+def test_rsi_generates_signal_and_rsi_columns(spy_data):
     strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
-    result = strategy.generate_signals(synthetic_oscillating_data)
+    result = strategy.generate_signals(spy_data)
     assert "rsi" in result.columns
     assert "signal" in result.columns
 
 
-def test_rsi_values_bounded_0_to_100(synthetic_oscillating_data):
+def test_rsi_values_bounded_0_to_100(spy_data):
     strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
-    result = strategy.generate_signals(synthetic_oscillating_data)
+    result = strategy.generate_signals(spy_data)
     rsi = result["rsi"].dropna()
     assert (rsi >= 0).all(), "RSI has values below 0"
     assert (rsi <= 100).all(), "RSI has values above 100"
 
 
-def test_rsi_signal_values_are_valid(synthetic_oscillating_data):
+def test_rsi_signal_values_are_valid(spy_data):
     strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
-    result = strategy.generate_signals(synthetic_oscillating_data)
+    result = strategy.generate_signals(spy_data)
     unique_signals = set(result["signal"].unique())
     assert unique_signals.issubset({0, 1}), f"Unexpected signal values: {unique_signals}"
 
 
-def test_rsi_no_lookahead_bias(synthetic_oscillating_data):
+def test_rsi_no_lookahead_bias(spy_data):
     """
     Verify look-ahead bias prevention: signal must not use today's close.
 
     We check the FIRST buy cross (RSI crossing up through oversold from a flat position).
     At that bar, signal must be 0. The 1 only appears at bar t+1.
-
-    Note: subsequent buy crosses may have signal=1 if we're already long from a prior
-    entry that hasn't been closed — that is not look-ahead bias, it's forward-filled state.
     """
     strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
-    result = strategy.generate_signals(synthetic_oscillating_data)
+    result = strategy.generate_signals(spy_data)
 
     rsi = result["rsi"]
     rsi_prev = rsi.shift(1)
 
-    # Find the very first buy cross
     all_buy_crosses = result.index[(rsi_prev < 30) & (rsi >= 30)]
 
     if len(all_buy_crosses) == 0:
-        pytest.skip("No RSI buy crosses in synthetic data — adjust parameters")
+        pytest.skip("No RSI buy crosses in SPY data for this period — adjust parameters")
 
     first_cross = all_buy_crosses[0]
     first_cross_loc = result.index.get_loc(first_cross)
 
-    # At the first cross bar the signal must be 0 (we were flat before any cross)
     signal_at_cross = result.iloc[first_cross_loc]["signal"]
     assert signal_at_cross == 0, (
         f"Look-ahead bias detected: signal={signal_at_cross} at first RSI buy cross bar {first_cross}. "
         "Signal must be 0 at the bar where the crossover occurs (acted on next bar)."
     )
 
-    # And at bar t+1 it should be 1
     if first_cross_loc + 1 < len(result):
         signal_next = result.iloc[first_cross_loc + 1]["signal"]
         assert signal_next == 1, (

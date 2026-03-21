@@ -24,7 +24,7 @@ from visualization.dashboard import generate_html_dashboard
 
 def main():
     parser = argparse.ArgumentParser(description="Generate HTML backtest dashboard")
-    parser.add_argument("--ticker",  default="AAPL",           help="Stock ticker symbol")
+    parser.add_argument("--ticker",  default="SPY",            help="Stock ticker symbol")
     parser.add_argument("--start",   default="2020-01-01",     help="Start date YYYY-MM-DD")
     parser.add_argument("--end",     default="2024-01-01",     help="End date YYYY-MM-DD")
     parser.add_argument("--capital", default=10_000.0, type=float, help="Initial capital")

@@ -1,8 +1,8 @@
 """
-Shared pytest fixtures using synthetic price data only.
+Shared pytest fixtures.
 
-No network calls in tests. All data is generated deterministically
-using numpy with np.random.seed(42).
+spy_data: real SPY daily OHLCV via yfinance (session-scoped, cached to .cache/).
+Synthetic fixtures remain for unit tests that need controlled/known data shapes.
 """
 
 from __future__ import annotations
@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from backtester.data import load_or_fetch
 from backtester.portfolio import Portfolio
 from strategies.ma_crossover import MovingAverageCrossover
 from strategies.rsi_mean_reversion import RSIMeanReversion
@@ -40,6 +41,28 @@ def _make_ohlcv(close_series: pd.Series) -> pd.DataFrame:
     df["volume"] = 1_000_000
     df.index.name = "date"
     return df
+
+
+@pytest.fixture(scope="session")
+def spy_data() -> pd.DataFrame:
+    """
+    Real SPY daily OHLCV from yfinance, 2020-01-01 to 2024-01-01, cached locally.
+
+    Falls back to synthetic trending data if the network is unavailable (e.g. in
+    sandboxed environments). CI runners have full network access and will always
+    use real data.
+    """
+    try:
+        return load_or_fetch("SPY", "2020-01-01", "2024-01-01")
+    except Exception:
+        import warnings
+        warnings.warn(
+            "yfinance unavailable — spy_data fixture falling back to synthetic data. "
+            "Real SPY data will be used in CI.",
+            stacklevel=2,
+        )
+        close = _make_price_series(n=1005, start_price=320.0, drift=0.0004, volatility=0.012, seed=7)
+        return _make_ohlcv(close)
 
 
 @pytest.fixture

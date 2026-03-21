@@ -96,7 +96,7 @@ def run_rsi_sweep(ticker: str, start: str, end: str, output_dir: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Run backtesting demo")
-    parser.add_argument("--ticker", default="AAPL", help="Stock ticker symbol")
+    parser.add_argument("--ticker", default="SPY", help="Stock ticker symbol")
     parser.add_argument("--start", default="2020-01-01", help="Start date YYYY-MM-DD")
     parser.add_argument("--end", default="2024-01-01", help="End date YYYY-MM-DD")
     parser.add_argument("--output-dir", default="outputs", help="Directory for chart output")
