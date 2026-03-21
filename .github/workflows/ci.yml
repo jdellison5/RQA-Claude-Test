@@ -24,3 +24,12 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+      - name: Generate HTML dashboard
+        run: python generate_dashboard.py --ticker SPY --start 2020-01-01 --end 2024-01-01
+
+      - name: Upload dashboard artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard
+          path: outputs/dashboard.html
