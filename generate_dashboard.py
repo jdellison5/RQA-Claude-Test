@@ -17,6 +17,7 @@ import os
 
 from backtester.data import load_or_fetch
 from backtester.engine import Backtester
+from strategies.breakout_trend import BreakoutTrendFollowing
 from strategies.ma_crossover import MovingAverageCrossover
 from strategies.rsi_mean_reversion import RSIMeanReversion
 from visualization.dashboard import generate_html_dashboard
@@ -36,8 +37,9 @@ def main():
     print(f"  Loaded {len(data)} bars.\n")
 
     strategies = [
-        ("MA Crossover (20/50)",       MovingAverageCrossover(fast_window=20, slow_window=50)),
-        ("RSI Mean Reversion (2)",     RSIMeanReversion(period=2, oversold=25, overbought=75)),
+        ("MA Crossover (20/50)",            MovingAverageCrossover(fast_window=20, slow_window=50)),
+        ("RSI Mean Reversion (2)",          RSIMeanReversion(period=2, oversold=25, overbought=75)),
+        ("252-Day Breakout + 5% Trail",     BreakoutTrendFollowing(breakout_period=252, trailing_stop=0.05)),
     ]
 
     results = []

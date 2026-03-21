@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
+from strategies.breakout_trend import BreakoutTrendFollowing
 from strategies.ma_crossover import MovingAverageCrossover
 from strategies.rsi_mean_reversion import RSIMeanReversion
 
@@ -149,3 +151,90 @@ def test_rsi_trend_filter_blocks_longs_below_sma(spy_data):
     assert (signals_when_prev_below == 0).all(), (
         "Trend filter violated: signal=1 found on a bar where previous close was below SMA"
     )
+
+
+# ---------------------------------------------------------------------------
+# BreakoutTrendFollowing tests
+# ---------------------------------------------------------------------------
+
+def test_breakout_generates_expected_columns(spy_data):
+    strategy = BreakoutTrendFollowing(breakout_period=252, trailing_stop=0.05)
+    result = strategy.generate_signals(spy_data)
+    for col in ("high_252", "trail_stop_level", "raw_signal", "signal"):
+        assert col in result.columns, f"Missing column: {col}"
+
+
+def test_breakout_signal_values_are_valid(spy_data):
+    strategy = BreakoutTrendFollowing(breakout_period=252, trailing_stop=0.05)
+    result = strategy.generate_signals(spy_data)
+    unique = set(result["signal"].unique())
+    assert unique.issubset({0, 1}), f"Unexpected signal values: {unique}"
+
+
+def test_breakout_trail_stop_level_correct(spy_data):
+    """trail_stop_level must equal high_252 * 0.95 everywhere."""
+    strategy = BreakoutTrendFollowing(breakout_period=252, trailing_stop=0.05)
+    result = strategy.generate_signals(spy_data).dropna(subset=["high_252"])
+    expected = result["high_252"] * 0.95
+    pd.testing.assert_series_equal(result["trail_stop_level"], expected, check_names=False)
+
+
+def test_breakout_no_lookahead_bias(spy_data):
+    """
+    At the first bar where a breakout triggers, signal must still be 0.
+    The 1 can only appear at the following bar.
+    """
+    strategy = BreakoutTrendFollowing(breakout_period=252, trailing_stop=0.05)
+    result = strategy.generate_signals(spy_data).dropna(subset=["high_252"])
+
+    breakout_bars = result.index[result["close"] > result["high_252"]]
+    if len(breakout_bars) == 0:
+        pytest.skip("No 252-day breakout in synthetic data — adjust parameters")
+
+    first = breakout_bars[0]
+    loc = result.index.get_loc(first)
+
+    assert result.iloc[loc]["signal"] == 0, (
+        f"Look-ahead bias: signal=1 at breakout bar {first}, expected 0"
+    )
+    if loc + 1 < len(result):
+        # Next bar should reflect the month-end snap — may be 1 if first is month-end
+        # Just verify it's a valid value (the key assertion is the one above)
+        assert result.iloc[loc + 1]["signal"] in (0, 1)
+
+
+def test_breakout_signal_changes_only_at_month_end(spy_data):
+    """
+    Signal transitions (0→1 or 1→0) must only occur on bars that immediately
+    follow a month-end bar, because of the 1-bar shift applied after monthly snapping.
+    """
+    strategy = BreakoutTrendFollowing(breakout_period=252, trailing_stop=0.05)
+    result = strategy.generate_signals(spy_data)
+
+    sig = result["signal"]
+    changed = sig != sig.shift(1)
+    change_locs = result.index[changed & sig.shift(1).notna()]
+
+    if len(change_locs) == 0:
+        pytest.skip("No signal changes in data — strategy never triggered")
+
+    # The bar *before* each change bar must have been a month-end
+    idx_series = result.index.to_series()
+    for bar in change_locs:
+        loc = result.index.get_loc(bar)
+        if loc == 0:
+            continue  # first bar initialises from NaN — skip
+        prev_bar = result.index[loc - 1]
+        prev_month = idx_series.iloc[loc - 1].month
+        curr_month = idx_series.iloc[loc].month
+        # prev_bar is month-end when the following bar (current bar) is in a new month
+        assert prev_month != curr_month or loc == 1, (
+            f"Signal changed at {bar} but previous bar {prev_bar} was not a month-end"
+        )
+
+
+def test_breakout_repr_includes_parameters():
+    strategy = BreakoutTrendFollowing(breakout_period=126, trailing_stop=0.08)
+    r = repr(strategy)
+    assert "126" in r
+    assert "8%" in r
