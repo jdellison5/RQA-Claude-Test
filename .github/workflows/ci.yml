@@ -36,8 +36,8 @@ jobs:
 
   deploy-pages:
     needs: test
-    # Only deploy from pushes to main (not PRs, not feature branches)
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Only deploy on direct pushes (not PRs)
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     permissions:
