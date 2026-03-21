@@ -55,6 +55,34 @@ def _signal_to_allocation(signal: pd.Series) -> pd.Series:
     return (signal * 100).astype(float)
 
 
+def _build_corr_matrix(
+    results: list[tuple[str, object]],
+    first_data: pd.DataFrame,
+    initial_capital: float,
+) -> dict:
+    """
+    Compute a correlation matrix of daily returns for all strategies + buy-and-hold.
+
+    Returns a dict with:
+        labels: list of series names
+        values: NxN list-of-lists of correlation coefficients (rounded to 4dp)
+    """
+    series = {}
+    for label, result in results:
+        ec = result.equity_curve.reindex(first_data.index).ffill()
+        series[label] = ec.pct_change().fillna(0)
+
+    bh = _buy_hold_equity(first_data, initial_capital)
+    series["Buy & Hold"] = bh.pct_change().fillna(0)
+
+    df = pd.DataFrame(series)
+    corr = df.corr()
+
+    labels = list(corr.columns)
+    values = [[round(corr.loc[r, c], 4) for c in labels] for r in labels]
+    return {"labels": labels, "values": values}
+
+
 # ---------------------------------------------------------------------------
 # Colour palette
 # ---------------------------------------------------------------------------
@@ -261,6 +289,7 @@ def generate_html_dashboard(
     stats_data   = json.dumps(stat_rows)
     trades_data  = json.dumps(trade_tables)
     strategy_labels = json.dumps([label for label, _ in results])
+    corr_data    = json.dumps(_build_corr_matrix(results, first_data, initial_capital))
 
     # -----------------------------------------------------------------------
     # Render HTML
@@ -314,6 +343,15 @@ def generate_html_dashboard(
   .badge {{ display: inline-block; padding: 2px 8px; border-radius: 4px;
             font-size: 0.75rem; font-weight: 600; margin-left: 6px; }}
   .badge-blue {{ background: #4C9BE822; color: #4C9BE8; }}
+  .corr-table {{ border-collapse: separate; border-spacing: 3px; width: auto; }}
+  .corr-table th {{ color: #7a8099; font-size: 0.72rem; padding: 6px 10px;
+                    white-space: nowrap; text-align: center; font-weight: 600; }}
+  .corr-table th.row-label {{ text-align: right; padding-right: 14px; }}
+  .corr-cell {{ width: 90px; height: 58px; border-radius: 6px; text-align: center;
+                vertical-align: middle; font-size: 0.78rem; font-weight: 700;
+                color: #fff; cursor: default; transition: opacity 0.15s; }}
+  .corr-cell:hover {{ opacity: 0.85; }}
+  .corr-wrap {{ overflow-x: auto; }}
 </style>
 </head>
 <body>
@@ -360,6 +398,12 @@ def generate_html_dashboard(
     <table id="statsTable"></table>
   </div>
 
+  <!-- Correlation Matrix -->
+  <div class="card">
+    <h2>Return Correlation Matrix <span class="badge badge-blue">daily returns</span></h2>
+    <div class="corr-wrap" id="corrMatrix"></div>
+  </div>
+
   <!-- Trade Logs -->
   <div class="card">
     <h2>Trade Log</h2>
@@ -375,6 +419,7 @@ const CHART_DATA    = {chart_data};
 const STATS_DATA    = {stats_data};
 const TRADES_DATA   = {trades_data};
 const STRATEGY_LABELS = {strategy_labels};
+const CORR_DATA     = {corr_data};
 
 // ── Chart.js defaults ──────────────────────────────────────────────────────
 Chart.defaults.color = "#7a8099";
@@ -462,7 +507,46 @@ makeChart("allocationChart", "line", CHART_DATA.allocation, {{
   table.innerHTML = thead + tbody + "</tbody>";
 }})();
 
-// ── 6. Trade logs ──────────────────────────────────────────────────────────
+// ── 6. Correlation matrix ──────────────────────────────────────────────────
+(function() {{
+  function corrColor(v) {{
+    // Diverging: red (-1) → dark (0) → green (+1)
+    const dark = [0x1a, 0x1d, 0x27];
+    const pos  = [0x4C, 0xE8, 0xA0];  // green
+    const neg  = [0xE8, 0x4C, 0x7A];  // red
+    const t = Math.abs(v);
+    const src = v >= 0 ? pos : neg;
+    const r = Math.round(dark[0] + t * (src[0] - dark[0]));
+    const g = Math.round(dark[1] + t * (src[1] - dark[1]));
+    const b = Math.round(dark[2] + t * (src[2] - dark[2]));
+    return `rgb(${{r}},${{g}},${{b}})`;
+  }}
+
+  const labels = CORR_DATA.labels;
+  const values = CORR_DATA.values;
+  const n = labels.length;
+
+  let html = '<table class="corr-table"><thead><tr><th></th>';
+  labels.forEach(l => html += `<th>${{l}}</th>`);
+  html += '</tr></thead><tbody>';
+
+  values.forEach((row, i) => {{
+    html += `<tr><th class="row-label">${{labels[i]}}</th>`;
+    row.forEach((v, j) => {{
+      const bg   = corrColor(v);
+      const diag = i === j ? 'opacity:0.5;' : '';
+      const text = i === j ? '—' : v.toFixed(2);
+      html += `<td class="corr-cell" style="background:${{bg}};${{diag}}"
+                  title="${{labels[i]}} × ${{labels[j]}}: ${{v.toFixed(4)}}">${{text}}</td>`;
+    }});
+    html += '</tr>';
+  }});
+
+  html += '</tbody></table>';
+  document.getElementById('corrMatrix').innerHTML = html;
+}})();
+
+// ── 7. Trade logs ──────────────────────────────────────────────────────────
 (function() {{
   const tabRow   = document.getElementById("tradeTabs");
   const panels   = document.getElementById("tradePanels");
