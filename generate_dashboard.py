@@ -17,6 +17,7 @@ import os
 
 from backtester.data import load_or_fetch
 from backtester.engine import Backtester
+from backtester.portfolio_engine import PortfolioBacktester
 from strategies.breakout_trend import BreakoutTrendFollowing
 from strategies.ma_crossover import MovingAverageCrossover
 from strategies.rsi_mean_reversion import RSIMeanReversion
@@ -36,14 +37,14 @@ def main():
     data = load_or_fetch(args.ticker, args.start, args.end)
     print(f"  Loaded {len(data)} bars.\n")
 
-    strategies = [
+    individual_strategies = [
         ("MA Crossover (20/50)",            MovingAverageCrossover(fast_window=20, slow_window=50)),
         ("RSI Mean Reversion (2)",          RSIMeanReversion(period=2, oversold=25, overbought=75)),
         ("252-Day Breakout + 5% Trail",     BreakoutTrendFollowing(breakout_period=252, trailing_stop=0.05)),
     ]
 
     results = []
-    for label, strategy in strategies:
+    for label, strategy in individual_strategies:
         print(f"Running: {label} ...")
         bt = Backtester(strategy=strategy, initial_capital=args.capital)
         result = bt.run(data)
@@ -51,6 +52,20 @@ def main():
         print(f"  CAGR: {m['cagr']:.2%}  |  Sharpe: {m['sharpe_ratio']:.2f}  "
               f"|  Max DD: {m['max_drawdown']:.2%}  |  Trades: {m['total_trades']}")
         results.append((label, result))
+
+    # Combined equal-weight portfolio
+    portfolio_label = "Equal-Weight Portfolio (Monthly Rebal)"
+    print(f"Running: {portfolio_label} ...")
+    pb = PortfolioBacktester(
+        strategies=[s for _, s in individual_strategies],
+        strategy_labels=[lbl for lbl, _ in individual_strategies],
+        initial_capital=args.capital,
+    )
+    portfolio_result = pb.run(data)
+    m = portfolio_result.metrics
+    print(f"  CAGR: {m['cagr']:.2%}  |  Sharpe: {m['sharpe_ratio']:.2f}  "
+          f"|  Max DD: {m['max_drawdown']:.2%}  |  Trades: {m['total_trades']}")
+    results.append((portfolio_label, portfolio_result))
 
     print(f"\nGenerating dashboard ...")
     path = generate_html_dashboard(
