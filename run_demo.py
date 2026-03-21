@@ -96,15 +96,16 @@ def run_rsi_sweep(ticker: str, start: str, end: str, output_dir: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Run backtesting demo")
-    parser.add_argument("--ticker", default="SPY", help="Stock ticker symbol")
-    parser.add_argument("--start", default="2020-01-01", help="Start date YYYY-MM-DD")
-    parser.add_argument("--end", default="2024-01-01", help="End date YYYY-MM-DD")
+    parser.add_argument("--ticker", default="SPY",  help="Stock ticker symbol")
+    parser.add_argument("--start",  default=None,   help="Start date YYYY-MM-DD (default: full history)")
+    parser.add_argument("--end",    default=None,   help="End date YYYY-MM-DD (default: today)")
     parser.add_argument("--output-dir", default="outputs", help="Directory for chart output")
     parser.add_argument("--sweep-rsi", action="store_true", help="Run RSI parameter sweep")
     args = parser.parse_args()
 
+    date_range = f"{args.start or 'max'} → {args.end or 'today'}"
     print(f"\n{'='*60}")
-    print(f"  Backtesting Demo  |  {args.ticker}  |  {args.start} → {args.end}")
+    print(f"  Backtesting Demo  |  {args.ticker}  |  {date_range}")
     print(f"{'='*60}")
 
     # Strategy 1: Moving Average Crossover

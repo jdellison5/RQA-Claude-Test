@@ -26,14 +26,15 @@ from visualization.dashboard import generate_html_dashboard
 
 def main():
     parser = argparse.ArgumentParser(description="Generate HTML backtest dashboard")
-    parser.add_argument("--ticker",  default="SPY",            help="Stock ticker symbol")
-    parser.add_argument("--start",   default="2020-01-01",     help="Start date YYYY-MM-DD")
-    parser.add_argument("--end",     default="2024-01-01",     help="End date YYYY-MM-DD")
+    parser.add_argument("--ticker",  default="SPY",  help="Stock ticker symbol")
+    parser.add_argument("--start",   default=None,   help="Start date YYYY-MM-DD (default: full history)")
+    parser.add_argument("--end",     default=None,   help="End date YYYY-MM-DD (default: today)")
     parser.add_argument("--capital", default=10_000.0, type=float, help="Initial capital")
     parser.add_argument("--output",  default="outputs/dashboard.html", help="Output HTML path")
     args = parser.parse_args()
 
-    print(f"\nFetching data for {args.ticker} ({args.start} → {args.end}) ...")
+    date_range = f"{args.start or 'max'} → {args.end or 'today'}"
+    print(f"\nFetching data for {args.ticker} ({date_range}) ...")
     data = load_or_fetch(args.ticker, args.start, args.end)
     print(f"  Loaded {len(data)} bars.\n")
 
@@ -71,8 +72,8 @@ def main():
     path = generate_html_dashboard(
         results=results,
         ticker=args.ticker,
-        start=args.start,
-        end=args.end,
+        start=args.start or "max",
+        end=args.end or "today",
         initial_capital=args.capital,
         output_path=args.output,
     )

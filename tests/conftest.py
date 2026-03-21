@@ -46,14 +46,14 @@ def _make_ohlcv(close_series: pd.Series) -> pd.DataFrame:
 @pytest.fixture(scope="session")
 def spy_data() -> pd.DataFrame:
     """
-    Real SPY daily OHLCV from yfinance, 2020-01-01 to 2024-01-01, cached locally.
+    Real SPY daily OHLCV from yfinance — full available history, cached locally.
 
     Falls back to synthetic trending data if the network is unavailable (e.g. in
     sandboxed environments). CI runners have full network access and will always
     use real data.
     """
     try:
-        return load_or_fetch("SPY", "2020-01-01", "2024-01-01")
+        return load_or_fetch("SPY")
     except Exception:
         import warnings
         warnings.warn(
@@ -61,7 +61,8 @@ def spy_data() -> pd.DataFrame:
             "Real SPY data will be used in CI.",
             stacklevel=2,
         )
-        close = _make_price_series(n=1005, start_price=320.0, drift=0.0004, volatility=0.012, seed=7)
+        # 8000 bars (~32 years) gives ample warm-up for 252-day indicators
+        close = _make_price_series(n=8000, start_price=50.0, drift=0.0003, volatility=0.010, seed=7)
         return _make_ohlcv(close)
 
 
