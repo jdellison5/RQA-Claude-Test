@@ -25,7 +25,7 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v --tb=short
 
-      - name: Generate HTML dashboard
+      - name: Generate HTML dashboard (CI preview)
         run: python generate_dashboard.py --ticker SPY --start 2020-01-01 --end 2024-01-01
 
       - name: Upload dashboard artifact
@@ -33,3 +33,47 @@ jobs:
         with:
           name: dashboard
           path: outputs/dashboard.html
+
+  deploy-pages:
+    needs: test
+    # Only deploy from pushes to main (not PRs, not feature branches)
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      pages: write      # required to deploy to Pages
+      id-token: write   # required for OIDC token used by deploy-pages
+
+    # Prevent multiple simultaneous deployments; a new push cancels the old one
+    concurrency:
+      group: github-pages
+      cancel-in-progress: true
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5.3.0
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate dashboard (full history)
+        # Outputs to index.html so the Pages root URL opens the dashboard directly
+        run: python generate_dashboard.py --ticker SPY --output outputs/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: outputs/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
