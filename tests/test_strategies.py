@@ -64,14 +64,14 @@ def test_ma_crossover_does_not_modify_original(spy_data):
 
 
 def test_rsi_generates_signal_and_rsi_columns(spy_data):
-    strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
+    strategy = RSIMeanReversion(period=2, oversold=25, overbought=75)
     result = strategy.generate_signals(spy_data)
     assert "rsi" in result.columns
     assert "signal" in result.columns
 
 
 def test_rsi_values_bounded_0_to_100(spy_data):
-    strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
+    strategy = RSIMeanReversion(period=2, oversold=25, overbought=75)
     result = strategy.generate_signals(spy_data)
     rsi = result["rsi"].dropna()
     assert (rsi >= 0).all(), "RSI has values below 0"
@@ -79,7 +79,7 @@ def test_rsi_values_bounded_0_to_100(spy_data):
 
 
 def test_rsi_signal_values_are_valid(spy_data):
-    strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
+    strategy = RSIMeanReversion(period=2, oversold=25, overbought=75)
     result = strategy.generate_signals(spy_data)
     unique_signals = set(result["signal"].unique())
     assert unique_signals.issubset({0, 1}), f"Unexpected signal values: {unique_signals}"
@@ -89,33 +89,32 @@ def test_rsi_no_lookahead_bias(spy_data):
     """
     Verify look-ahead bias prevention: signal must not use today's close.
 
-    We check the FIRST buy cross (RSI crossing up through oversold from a flat position).
+    We check the FIRST bar where RSI2 drops below the oversold level.
     At that bar, signal must be 0. The 1 only appears at bar t+1.
     """
-    strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
+    strategy = RSIMeanReversion(period=2, oversold=25, overbought=75)
     result = strategy.generate_signals(spy_data)
 
     rsi = result["rsi"]
-    rsi_prev = rsi.shift(1)
 
-    all_buy_crosses = result.index[(rsi_prev < 30) & (rsi >= 30)]
+    all_buy_bars = result.index[rsi < 25]
 
-    if len(all_buy_crosses) == 0:
-        pytest.skip("No RSI buy crosses in SPY data for this period — adjust parameters")
+    if len(all_buy_bars) == 0:
+        pytest.skip("No RSI2 oversold bars in SPY data for this period — adjust parameters")
 
-    first_cross = all_buy_crosses[0]
-    first_cross_loc = result.index.get_loc(first_cross)
+    first_buy = all_buy_bars[0]
+    first_buy_loc = result.index.get_loc(first_buy)
 
-    signal_at_cross = result.iloc[first_cross_loc]["signal"]
-    assert signal_at_cross == 0, (
-        f"Look-ahead bias detected: signal={signal_at_cross} at first RSI buy cross bar {first_cross}. "
-        "Signal must be 0 at the bar where the crossover occurs (acted on next bar)."
+    signal_at_bar = result.iloc[first_buy_loc]["signal"]
+    assert signal_at_bar == 0, (
+        f"Look-ahead bias detected: signal={signal_at_bar} at first RSI2 oversold bar {first_buy}. "
+        "Signal must be 0 at the bar where the condition triggers (acted on next bar)."
     )
 
-    if first_cross_loc + 1 < len(result):
-        signal_next = result.iloc[first_cross_loc + 1]["signal"]
+    if first_buy_loc + 1 < len(result):
+        signal_next = result.iloc[first_buy_loc + 1]["signal"]
         assert signal_next == 1, (
-            f"Expected signal=1 at bar after first buy cross, got {signal_next}"
+            f"Expected signal=1 at bar after first oversold bar, got {signal_next}"
         )
 
 

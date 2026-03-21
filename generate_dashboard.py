@@ -37,7 +37,7 @@ def main():
 
     strategies = [
         ("MA Crossover (20/50)",       MovingAverageCrossover(fast_window=20, slow_window=50)),
-        ("RSI Mean Reversion (14)",    RSIMeanReversion(period=14, oversold=30, overbought=70)),
+        ("RSI Mean Reversion (2)",     RSIMeanReversion(period=2, oversold=25, overbought=75)),
     ]
 
     results = []

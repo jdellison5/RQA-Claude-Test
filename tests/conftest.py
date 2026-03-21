@@ -120,4 +120,4 @@ def ma_strategy() -> MovingAverageCrossover:
 
 @pytest.fixture
 def rsi_strategy() -> RSIMeanReversion:
-    return RSIMeanReversion(period=14, oversold=30, overbought=70)
+    return RSIMeanReversion(period=2, oversold=25, overbought=75)

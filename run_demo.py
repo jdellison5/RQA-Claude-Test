@@ -76,7 +76,7 @@ def run_rsi_sweep(ticker: str, start: str, end: str, output_dir: str):
     rows = []
 
     for oversold_level in [25, 30, 35]:
-        strategy = RSIMeanReversion(period=14, oversold=oversold_level, overbought=70)
+        strategy = RSIMeanReversion(period=2, oversold=oversold_level, overbought=75)
         bt = Backtester(strategy=strategy, initial_capital=10_000.0)
         result = bt.run(data)
         m = result.metrics
@@ -120,7 +120,7 @@ def main():
     )
 
     # Strategy 2: RSI Mean Reversion
-    rsi_strategy = RSIMeanReversion(period=14, oversold=30, overbought=70)
+    rsi_strategy = RSIMeanReversion(period=2, oversold=25, overbought=75)
     run_strategy(
         ticker=args.ticker,
         start=args.start,
