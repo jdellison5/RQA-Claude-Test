@@ -1,15 +1,15 @@
 # Claude Code Live Demo Guide
 ### University of Richmond — Technical Analysis Class
 
-> **Purpose:** Step-by-step script for rebuilding this backtesting framework live in front of a class, starting from an empty repository. Each prompt is copy-paste ready. Total runtime: ~50 minutes.
+> **Purpose:** A step-by-step script for building a stock backtesting tool live in front of the class, starting from nothing. Each prompt is copy-paste ready and written in plain English — no programming experience needed. Total runtime: ~50 minutes.
 
 ---
 
 ## Before Class
 
-- [ ] Clone the repo and confirm Python 3.11 is available
+- [ ] Clone the repo and make sure Python is installed
 - [ ] Run `pip install pandas numpy matplotlib yfinance ta pytest` once so packages are cached
-- [ ] Run `python generate_dashboard.py` once to populate `.cache/SPY_*.csv` (protects against network issues during the lecture)
+- [ ] Run `python generate_dashboard.py` once to save a local copy of SPY data (protects against network issues during the lecture)
 - [ ] Have this file open in a second window so you can paste prompts quickly
 - [ ] Open the GitHub Actions tab in a browser tab so you can show CI results live
 
@@ -17,92 +17,98 @@
 
 ## The Narrative
 
-> *"I'm going to show you how to build a fully tested, documented technical analysis backtesting framework from an empty repository — using Claude Code. We'll do it live. The repo starts empty. By the end, we'll have two strategies, an interactive dashboard, and a CI pipeline running tests in the cloud."*
+> *"I'm going to show you how to build a stock trading strategy backtester from scratch — using plain English. No prior coding experience required. I'll just describe what I want, and Claude Code will build it. By the end, we'll have two real strategies, an interactive dashboard, and automated tests running in the cloud."*
 
 ---
 
-## Act 1 — Scaffold the Project (10 min)
+## Act 1 — Build the Foundation (10 min)
 
-**What you're showing:** Claude Code can generate an entire professional project structure from a plain-English description in seconds.
+**What you're showing:** You can describe a complex project in plain English and Claude Code will create the entire structure instantly.
 
-### Prompt 1 — Project scaffold
+### Prompt 1 — Set up the project
 
 ```
-Create a Python backtesting framework project structure. I need:
-- A `backtester` package with engine.py, portfolio.py, data.py, and metrics.py
-- A `strategies` package with a base class and two strategies:
-  Moving Average Crossover and RSI Mean Reversion
-- A `visualization` package with charts.py
-- A `tests` directory with pytest fixtures
-- A requirements.txt with pandas, numpy, matplotlib, yfinance, ta, and pytest
-- A run_demo.py entry point
+I want to build a stock trading backtester in Python. It should be able to:
+- Download historical stock price data from the internet
+- Run trading strategies on that data to simulate how they would have performed
+- Track a portfolio over time and calculate performance metrics like returns, risk, and win rate
+- Display the results visually
 
-Use dataclasses where appropriate. Add type hints and docstrings throughout.
+Please set up the full project structure for me, including everything needed to run tests.
 ```
 
 **Teaching points:**
-- Notice it created all `__init__.py` files automatically
-- Type hints throughout — this is what professional code looks like
-- The abstract base class in `strategies/base.py` enforces a contract — every strategy must implement `generate_signals()`
+- Claude Code created every file and folder automatically — you didn't name a single one
+- Notice it also created a `tests` folder — it's already thinking about quality
+- Ask the class: *"What would this have taken a solo developer to set up? A day? A week?"*
 
 ---
 
-## Act 2 — Implement the Core Engine (15 min)
+## Act 2 — Build the Core Logic (15 min)
 
-**What you're showing:** Claude Code understands financial concepts, not just syntax.
+**What you're showing:** Claude Code understands finance, not just code.
 
-### Prompt 2 — Portfolio
-
-```
-Implement the Portfolio class in backtester/portfolio.py.
-It should track a single long position at a time using all available cash,
-calculate P&L when a position closes, and maintain a daily equity curve.
-Use a dataclass for Trade records.
-```
-
-### Prompt 3 — Engine
+### Prompt 2 — Track trades and a portfolio
 
 ```
-Implement the Backtester engine in backtester/engine.py.
-It should call strategy.generate_signals() once up front, then iterate
-bar by bar executing trades. Return a BacktestResult dataclass.
+Now build out the part that tracks our trades and portfolio value over time.
+It should be able to:
+- Start with a set amount of cash
+- Buy shares with all available cash when we get a buy signal
+- Sell all shares when we get a sell signal
+- Record every trade and calculate profit or loss on each one
+- Track the total value of our portfolio each day
+```
 
-Important: prevent look-ahead bias — we should only act on signals from
-the previous bar, not the current bar's close price.
+### Prompt 3 — Build the backtesting engine
+
+```
+Build the backtesting engine — the part that actually runs a strategy against historical data.
+It should go through the price data day by day and decide whether to buy or sell based on the strategy's signals.
+
+One important rule: we should only be able to act on information we would have actually known at the time.
+For example, if a signal triggers at the end of Monday, we shouldn't be able to trade until Tuesday —
+we can't trade on a signal we didn't have yet.
 ```
 
 **🔑 Teaching moment — look-ahead bias:**
-> *"This is one of the most common mistakes in backtesting. You can't trade on a signal computed from today's closing price — the market is still open. Claude Code used `.shift(1)` to lag the signal by one bar. We'll test this explicitly later."*
+> *"This is one of the most common mistakes in backtesting. Imagine betting on a horse race after you already know who won — of course you'd look like a genius. If your backtest lets tomorrow's data influence today's trade, the results look great, but the strategy is worthless in real life. Claude Code prevented this automatically."*
 
 Draw on the board:
 ```
-Bar t closes → signal computed → signal.shift(1) → trade executes at Bar t+1 open
+Monday closes → signal calculated → can only trade on Tuesday
 ```
 
-### Prompt 4 — Metrics
+### Prompt 4 — Calculate performance metrics
 
 ```
-Implement backtester/metrics.py with these functions:
-sharpe_ratio, max_drawdown, max_drawdown_duration, cagr, win_rate, profit_factor.
-Include the full formula as a docstring for each.
+Add the ability to calculate standard performance metrics for any strategy we test:
+- Annualized return (CAGR)
+- Sharpe ratio (return relative to risk)
+- Maximum drawdown (worst loss from a peak)
+- Win rate (what percentage of trades were profitable)
+- Profit factor (total gains divided by total losses)
+
+Please include a brief plain-English explanation of what each metric means in the code itself.
 ```
 
-**Teaching moment:** Walk through the Sharpe ratio formula — students know it from portfolio theory. Connect the formula to what they're about to see in the output.
+**Teaching moment:** Walk through Sharpe ratio — students know it from portfolio theory. Connect the formula to what they're about to see in the output.
 
 ---
 
-## Act 3 — Strategies + Iteration (15 min)
+## Act 3 — Build the Strategies (15 min)
 
-**What you're showing:** The iterative workflow. Ask → run → ask again.
+**What you're showing:** The iterative workflow. Ask → run → refine.
 
-### Prompt 5 — MA Crossover strategy
+### Prompt 5 — Moving Average Crossover strategy
 
 ```
-Implement the MovingAverageCrossover strategy in strategies/ma_crossover.py.
-Fast window default 20 days, slow window default 50 days.
-Add SMA columns to the dataframe and generate a buy signal (1) when the
-fast SMA crosses above the slow SMA, and a sell signal (0) when it crosses below.
-Remember to shift the signal by 1 bar to prevent look-ahead bias.
+Build a Moving Average Crossover strategy.
+The idea: calculate a short-term average (20 days) and a long-term average (50 days) of the stock's price.
+Buy when the short-term average crosses above the long-term average — that's a "golden cross."
+Sell when it crosses back below — that's a "death cross."
+
+Make sure the strategy can't see future data when generating signals.
 ```
 
 ### Run it
@@ -112,61 +118,60 @@ python run_demo.py --ticker SPY --start 2020-01-01 --end 2024-01-01
 ```
 
 Show the console metrics table. Discuss each metric:
-- **CAGR** — annualized growth rate
-- **Sharpe** — return per unit of risk (>1 is good, >2 is excellent)
-- **Max Drawdown** — worst peak-to-trough loss
-- **Win Rate** — fraction of trades that were profitable
+- **CAGR** — if you'd invested on day one, what annual return did you earn?
+- **Sharpe** — how much return did you get per unit of risk? (>1 is solid, >2 is great)
+- **Max Drawdown** — at its worst, how far did the portfolio fall from its peak?
+- **Win Rate** — what fraction of trades made money?
 
-### Prompt 6 — Add benchmark to chart
+### Prompt 6 — Add a benchmark to compare against
 
 ```
-Modify visualization/charts.py to add a buy-and-hold benchmark line
-to the equity curve panel. Show the benchmark as a dashed gray line.
-Also add benchmark CAGR and benchmark Sharpe to the metrics table.
+Update the performance chart to include a "buy and hold" benchmark line —
+what would have happened if we just bought the stock on day one and held it the whole time.
+Show it as a dashed gray line so it's easy to distinguish from our strategy.
+Also add the buy-and-hold return and risk metrics to the summary table so we can compare directly.
 ```
 
 **Teaching moment:**
-> *"I didn't describe how to calculate buy-and-hold returns. Claude Code already knows. And it only modified the files that needed to change — it didn't touch the engine or the strategies."*
+> *"I didn't explain how to calculate buy-and-hold returns. Claude Code already knew. And notice it only changed the chart code — it didn't touch the strategy or the engine."*
 
-### Prompt 7 — RSI strategy
-
-```
-Implement the RSIMeanReversion strategy in strategies/rsi_mean_reversion.py
-using the `ta` library's RSIIndicator (not pandas-ta — not compatible with Python 3.11).
-Generate a buy signal when RSI crosses up through 30,
-and a sell signal when RSI crosses down through 70.
-Shift the signal by 1 bar to prevent look-ahead bias.
-```
-
-**Ask the class:** *"What do you expect to happen if we change the oversold threshold from 30 to 25? More trades or fewer? Better or worse Sharpe?"*
-
-### Prompt 8 — Parameter sweep
+### Prompt 7 — RSI Mean Reversion strategy
 
 ```
-Add a --sweep-rsi flag to run_demo.py that tests RSI oversold levels
-of [25, 30, 35] and prints a comparison table showing CAGR, Sharpe,
-max drawdown, and trade count for each.
+Build a second strategy based on RSI (Relative Strength Index).
+The idea: when a stock has been beaten down a lot (RSI below 30), it's oversold — buy it.
+When it's been overbought (RSI above 70), sell it.
+
+Again, make sure the strategy can only use information available at the time of the trade.
 ```
 
-Run it. Let the class interpret the results.
+**Ask the class:** *"What do you expect to happen if we change the 'oversold' level from 30 to 25? Will we trade more or less often? Will the returns be better or worse?"*
+
+### Prompt 8 — Test different RSI settings
+
+```
+Add an option to automatically test different RSI oversold thresholds — try 25, 30, and 35.
+Show a comparison table with the return, Sharpe ratio, max drawdown, and number of trades for each setting.
+```
+
+Run it. Let the class interpret the results before you comment.
 
 ---
 
 ## Act 4 — Tests + Bug Demo (10 min)
 
-**What you're showing:** Claude Code writes tests that catch real financial logic bugs.
+**What you're showing:** Automated tests catch real financial logic errors before they cost money.
 
-### Prompt 9 — Full test suite
+### Prompt 9 — Write a test suite
 
 ```
-Write a comprehensive pytest test suite for this project in the tests/ directory.
-Use synthetic price data (no network calls) generated with numpy and np.random.seed(42).
-Include tests for:
-- Portfolio P&L calculations with known expected values
-- The engine's look-ahead bias prevention
-- Metrics with manually verifiable expected values (e.g. an equity curve that
-  doubles in 252 days should have CAGR ≈ 100%)
-- Strategy signals always being valid (only 0 or 1)
+Write a full set of automated tests for everything we've built.
+The tests should:
+- Use fake, made-up price data so they don't need an internet connection
+- Check that the portfolio calculates profits and losses correctly
+- Verify that our strategies can't accidentally use future data
+- Confirm that all the performance metrics produce correct results with known inputs
+- Make sure strategy signals are always valid
 ```
 
 Run the tests:
@@ -175,76 +180,78 @@ Run the tests:
 pytest tests/ -v
 ```
 
-Watch ~46 green tests appear. Note: "Under 0.5 seconds. No network calls. Fully deterministic."
+Watch the green checkmarks appear. Note: *"Under half a second. No internet required. Same result every time."*
 
-### 🎭 The bug demo (most dramatic moment)
+### The bug demo — most dramatic moment
 
-**Step 1** — Intentionally break look-ahead bias:
+**Step 1** — Intentionally break the look-ahead bias protection:
 
 Open `strategies/ma_crossover.py` and remove the `.shift(1)`:
 ```python
-# Change this:
+# Change this (correct):
 df["signal"] = pd.Series(raw_signal, index=df.index).shift(1).fillna(0).astype(int)
 
-# To this (broken):
+# To this (broken — strategy can now "see the future"):
 df["signal"] = pd.Series(raw_signal, index=df.index).fillna(0).astype(int)
 ```
 
-**Step 2** — Run tests:
+**Step 2** — Run the tests:
 ```bash
 pytest tests/ -v
 ```
 
-The `test_ma_crossover_no_lookahead_bias` test fails with a clear message.
+One test fails with a clear message pointing directly to the problem.
 
-**Step 3** — Fix it:
+**Step 3** — Fix it with Claude Code:
 ```
-Fix the look-ahead bias in strategies/ma_crossover.py.
+The look-ahead bias test is failing in the moving average strategy. Please fix it.
 ```
 
-Tests pass again.
+Tests go green again.
 
 **Teaching moment:**
-> *"In production, look-ahead bias makes your backtest look fantastic. You'd think you had a great strategy. You'd deploy it. You'd lose money — because the live system can't see tomorrow's close. The test caught it. This is why we write tests."*
+> *"Without that test, this bug could have gone undetected. The backtest results would have looked great — because the strategy was secretly cheating. You'd deploy it with real money, and you'd lose — because in real life, you can't trade on tomorrow's close. The test caught it instantly."*
 
 ---
 
 ## Act 5 — Dashboard + CI (5 min)
 
-### Generate the HTML dashboard
+### Generate the interactive dashboard
 
 ```bash
 python generate_dashboard.py --ticker SPY --start 2020-01-01 --end 2024-01-01
 open outputs/dashboard.html
 ```
 
-Walk through the dashboard sections:
-1. **Equity curves** — all strategies vs buy-and-hold
-2. **Drawdown** — how far underwater each strategy got
-3. **Rolling Sharpe** — does the edge persist over time, or was it luck?
-4. **Rolling allocation** — when was each strategy invested vs in cash?
-5. **Correlation matrix** — are the strategies actually different from each other?
-6. **Trade log** — every single trade, with P&L
+Walk through each section:
+1. **Equity curves** — all strategies vs buy-and-hold, over time
+2. **Drawdown** — how far underwater each strategy got at its worst
+3. **Rolling Sharpe** — is the edge consistent, or did it just get lucky in one period?
+4. **Rolling allocation** — when was each strategy in the market vs sitting in cash?
+5. **Correlation matrix** — are the two strategies actually doing different things?
+6. **Trade log** — every single trade, with entry, exit, and profit/loss
 
 **On the correlation matrix:**
-> *"If two strategies are highly correlated, running both doesn't reduce your risk much — you're essentially doubling down. A low or negative correlation between strategies is where real portfolio diversification comes from."*
+> *"If two strategies move together — both up on the same days, both down on the same days — then running both doesn't actually reduce your risk. Real diversification comes from strategies that don't move in lockstep."*
 
 ### Show CI
 
 Open the GitHub Actions tab. Show a green run. Explain:
-> *"Every time we push code, GitHub spins up a fresh server, installs all our dependencies, fetches real SPY data from Yahoo Finance, and runs all 46 tests automatically. If anything breaks, we get an email before it reaches production."*
+> *"Every time we push code, GitHub automatically spins up a fresh computer in the cloud, installs everything, downloads real SPY data, and runs all the tests. If anything breaks, we get notified before it ever reaches production. We didn't write any of that pipeline — we asked Claude Code to set it up."*
 
 ---
 
 ## Closing (2 min)
 
-> *"In under an hour, we went from an empty repository to:*
-> - *A tested, documented backtesting framework*
-> - *Two technical strategies with look-ahead bias protection*
-> - *An interactive HTML dashboard with correlation analysis*
-> - *A CI pipeline running against real market data in the cloud*
+> *"In under an hour, we went from nothing to:*
+> - *A working backtesting framework that handles real market data*
+> - *Two technical strategies with built-in protection against cheating*
+> - *An interactive dashboard with correlation analysis*
+> - *Automated tests running in the cloud on every change*
 >
-> *Claude Code handled the boilerplate, remembered the patterns, and enforced consistency. Your job — as a quant, as any engineer — is to ask the right questions and understand the output. That judgment is what Claude Code cannot replace."*
+> *The only thing we wrote was plain English. Claude Code handled everything else.*
+>
+> *Your value — as a quant, as any analyst — isn't writing the code. It's knowing enough to ask the right questions, and enough to recognize when the answer is wrong. That judgment is what Claude Code cannot replace."*
 
 ---
 
@@ -252,28 +259,27 @@ Open the GitHub Actions tab. Show a green run. Explain:
 
 | Question | Answer |
 |---|---|
-| "Why `ta` and not `pandas-ta`?" | `pandas-ta` doesn't support Python 3.11+. `ta` is pure Python, always installable. |
-| "Can we add MACD?" | "Great idea — prompt: *Add a MACDCrossover strategy using `ta.trend.MACD`, same interface as MovingAverageCrossover.*" Takes 2 min. |
-| "Why not use TA-Lib?" | TA-Lib requires a compiled C binary. Painful to install. `ta` just works with pip. |
-| "Can this run on live data?" | Yes — replace `load_or_fetch` with a streaming data source. The engine doesn't care where the DataFrame comes from. |
-| "What's look-ahead bias?" | Using future information to make a past decision. Like betting on a horse race after knowing the results. |
-| "Why `iterrows()` and not vectorized?" | Readability and correctness first. For a lecture, you want students to see each bar processed one at a time. Production would vectorize. |
+| "Can we add a MACD strategy?" | Absolutely — try: *"Add a MACD crossover strategy. Buy when the MACD line crosses above the signal line. Sell when it crosses below."* Takes about 2 minutes. |
+| "What's look-ahead bias in plain English?" | Using future information to make a past decision. Like betting on a horse race after knowing the results — of course you'd look smart. |
+| "Could this work with live data instead of historical?" | Yes. The strategy and engine don't care where the data comes from. You'd swap out the data source and plug in a real brokerage API. |
+| "How is this different from just using Excel?" | Excel can do simple backtests, but it can't run automated tests, version control your logic, or scale to thousands of strategies. This approach is how it's actually done at hedge funds. |
+| "Why does the RSI strategy trade so rarely?" | Mean reversion strategies wait for extreme conditions. Long stretches with no trades are normal — the strategy is patient by design. |
+| "Could someone actually use this to make money?" | The framework is real. The strategies are simple examples. Real quant strategies involve much more rigorous testing, transaction cost modeling, and risk management. |
 
 ---
 
-## Key Files for Reference
+## Key Sections of the Codebase
 
-| File | What it does |
+| What it does | Where it lives |
 |---|---|
-| `backtester/engine.py` | Bar-by-bar execution loop |
-| `backtester/portfolio.py` | Position tracking and P&L math |
-| `backtester/metrics.py` | Sharpe, drawdown, CAGR, win rate, profit factor |
-| `backtester/data.py` | yfinance fetch + local CSV cache |
-| `strategies/base.py` | Abstract interface all strategies must implement |
-| `strategies/ma_crossover.py` | SMA Golden/Death Cross |
-| `strategies/rsi_mean_reversion.py` | RSI oversold/overbought using `ta` library |
-| `visualization/dashboard.py` | Generates self-contained HTML dashboard |
-| `tests/conftest.py` | Shared fixtures (SPY data + synthetic fallback) |
-| `run_demo.py` | CLI entry point for console output + PNG charts |
-| `generate_dashboard.py` | CLI entry point for HTML dashboard |
-| `.github/workflows/ci.yml` | GitHub Actions CI — runs pytest on every push |
+| Downloads and caches stock price data | `backtester/data.py` |
+| Goes through data day by day and executes trades | `backtester/engine.py` |
+| Tracks cash, shares, and portfolio value | `backtester/portfolio.py` |
+| Calculates Sharpe, drawdown, CAGR, win rate | `backtester/metrics.py` |
+| Moving Average Crossover logic | `strategies/ma_crossover.py` |
+| RSI Mean Reversion logic | `strategies/rsi_mean_reversion.py` |
+| Generates the HTML dashboard | `visualization/dashboard.py` |
+| Automated test suite | `tests/` |
+| Runs tests automatically in the cloud | `.github/workflows/ci.yml` |
+| Command-line entry point for console output | `run_demo.py` |
+| Command-line entry point for the dashboard | `generate_dashboard.py` |
